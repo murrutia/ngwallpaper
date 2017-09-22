@@ -186,7 +186,6 @@ class NGMLatest(NGMOrigin):
         result = []
         gallery = BeautifulSoup(contents).find('div', {'id': 'gallery'})
         for item in gallery.findAll('a', {'target': '_blank', 'href': re.compile(r'^/wallpaper/img/')}):
-            print item['href']
             result.append(self._expand_href(self._root_url, item['href']))
         return result
 
@@ -248,10 +247,7 @@ class MiscellaneousGalleriesOrigin(LeafOrigin):
                 options.append(item['url'])
 
             if len(options) > 0:
-                wallpaper_url = self._expand_href(
-                    gallery_url,
-                    random.choice(options))
-                print wallpaper_url
+                wallpaper_url = self._expand_href(gallery_url, random.choice(options))
 
         fp.close()
 
@@ -376,7 +372,11 @@ def main(origins, destination, store, retries):
                     'Failed to download wallpaper'
 
                 # Store meta data of the selected photo
-                with open(os.path.join(destination +'/_meta', filename + '.txt'), 'w') as fd:
+                meta_folder = destination +'/_meta'
+                if not os.path.exists(meta_folder):
+                    os.makedirs(meta_folder)
+
+                with open(os.path.join(meta_folder, filename + '.txt'), 'w') as fd:
                     fd.write(wallpaper['index'] + '\n')
                     fd.write(wallpaper['url'] + '\n')
 
