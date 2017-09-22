@@ -314,26 +314,27 @@ def download_wallpaper(url, destination, filename):
     return file
 
 
-def script(code):
-    return subprocess.call(
+def script(code, return_output=False):
+    if return_output:
+        func = subprocess.check_output
+    else:
+        func = subprocess.call
+
+    return func(
         ['bash', '-c', code],
         shell=False,
         stdin=None,
-        stdout=sys.stdout,
         stderr=sys.stdout)
 
+def sqlite_call(command, return_output=False):
+    return script(''' sqlite3 ~/Library/Application\ Support/Dock/desktoppicture.db "%(command)s" ''' % { 'command': command }, return_output)
 
 def set_wallpaper(file):
     # See http://superuser.com/a/689804.
     assert \
-        script('''
-            sqlite3 ~/Library/Application\ Support/Dock/desktoppicture.db "update data set value = '%(file)s'"
-            killall Dock
-        ''' % {
-            'file': file,
-        }) == 0, \
+        sqlite_call(''' update data set value = '%(file)s' ''' % { 'file': file } ) == 0 and \
+        script('killall Dock') == 0, \
         'Failed to set wallpaper'
-
 
 def main(origins, destination, store, retries):
     # Initializations.
@@ -449,3 +450,4 @@ if __name__ == '__main__':
     else:
         parser.print_help()
         sys.exit(1)
+
