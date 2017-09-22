@@ -28,6 +28,7 @@ import tempfile
 import urlparse
 from xml.etree import ElementTree
 from BeautifulSoup import BeautifulSoup
+import json
 
 FILENAME = 'ngwallpaper'
 EXTENSIONS = ['.jpg', '.jpeg', '.png']
@@ -185,6 +186,7 @@ class NGMLatest(NGMOrigin):
         result = []
         gallery = BeautifulSoup(contents).find('div', {'id': 'gallery'})
         for item in gallery.findAll('a', {'target': '_blank', 'href': re.compile(r'^/wallpaper/img/')}):
+            print item['href']
             result.append(self._expand_href(self._root_url, item['href']))
         return result
 
@@ -234,14 +236,23 @@ class MiscellaneousGalleriesOrigin(LeafOrigin):
         fp = urllib2.urlopen(gallery_url, None, self._timeout)
         if fp.getcode() == 200:
             options = []
-            for item in BeautifulSoup(fp.read()).\
-                    find('div', {'id': 'gallery'}).\
-                    findAll('p', {'class': 'wallpaper_link'}):
-                options.append(item.find('a')['href'])
+
+            json_obj =  json.loads(
+                            BeautifulSoup(fp.read()).\
+                            find('div', { "data-pestle-module": "PresentationMode" }).\
+                            find('script').string
+                        )
+            items = json_obj['json']['items'][0]['items']
+
+            for item in items:
+                options.append(item['url'])
+
             if len(options) > 0:
                 wallpaper_url = self._expand_href(
                     gallery_url,
                     random.choice(options))
+                print wallpaper_url
+
         fp.close()
 
         # Fetch wallpaper page URL and extract image URL.
@@ -250,12 +261,7 @@ class MiscellaneousGalleriesOrigin(LeafOrigin):
             if fp.getcode() == 200:
                 result = {
                     'index': gallery_url,
-                    'url': self._expand_href(
-                        wallpaper_url,
-                        BeautifulSoup(fp.read()).
-                            find('div', {'id': 'content_top'}).
-                            find('div', {'class': 'download_link'}).
-                            find('a')['href']),
+                    'url': wallpaper_url
                 }
             fp.close()
 
@@ -345,10 +351,13 @@ def main(origins, destination, store, retries):
         # Add some delay.
         time.sleep(min(float((retries - i) * 100), 5000.0) / 1000.0)
 
+
         # Ignore exceptions.
         try:
             # Fetch some random photo.
+
             wallpaper = ComposedOrigin(origins).photo
+
             assert \
                 wallpaper is not None, \
                 'Failed to fetch wallpaper'
@@ -367,7 +376,7 @@ def main(origins, destination, store, retries):
                     'Failed to download wallpaper'
 
                 # Store meta data of the selected photo
-                with open(os.path.join(destination, filename + '.txt'), 'w') as fd:
+                with open(os.path.join(destination +'/_meta', filename + '.txt'), 'w') as fd:
                     fd.write(wallpaper['index'] + '\n')
                     fd.write(wallpaper['url'] + '\n')
 
