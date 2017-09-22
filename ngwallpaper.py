@@ -443,6 +443,16 @@ if __name__ == '__main__':
         default=100,
         help='number of retries before failing / using a previously downloaded wallpaper')
 
+    parser.add_argument(
+        '--different-on-each-monitor', dest='diff_on_monitors', required=False,
+        action='store_true',
+        help='Loads a different image on each monitor')
+
+    parser.add_argument(
+        '--different-on-each-space', dest='diff_on_spaces', required=False,
+        action='store_true',
+        help='Loads a different image on each space')
+
     options = parser.parse_args()
 
     if options.origins and options.retries > 0:
