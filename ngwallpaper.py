@@ -12,27 +12,32 @@ for a detailed description and other useful information.
 :license: BSD, see LICENSE for more details.
 '''
 
+import sys
+import json
+import time
 import argparse
 import tempfile
-from modules import wallsetter as ws
-from modules import wrappers as wp
+
+sys.path.append('modules')
+import Origins
+from Wallpapers import Wallpapers
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
         '--use-ngm-latest', dest='origins', required=False,
-        action='append_const', const=wp.NGMLatest(),
+        action='append_const', const=Origins.NGMLatest(),
         help='enable "NGM latest" repository')
 
     parser.add_argument(
         '--use-ngm-archive', dest='origins', required=False,
-        action='append_const', const=wp.NGMArchive(),
+        action='append_const', const=Origins.NGMArchive(),
         help='enable "NGM archive" repository')
 
     parser.add_argument(
         '--use-miscellaneous-galleries', dest='origins', required=False,
-        action='append_const', const=wp.MiscellaneousGalleriesOrigin(wp.MISCELANEOUS_GALLERIES),
+        action='append_const', const=Origins.MiscellaneousGalleriesOrigin(Origins.MISCELANEOUS_GALLERIES),
         help='enable "Miscellaneous galleries" repository')
 
     parser.add_argument(
@@ -58,7 +63,8 @@ if __name__ == '__main__':
     options = parser.parse_args()
 
     if options.origins and options.retries > 0:
-        ws.main(options.origins, options.destination, options.store, options.retries, options.differenciation_by)
+        Wallpapers(options.origins, options.destination, options.store, options.retries, options.differenciation_by)\
+            .apply()
     else:
         parser.print_help()
         sys.exit(1)

@@ -3,13 +3,13 @@
 
 import json
 
-import script
-import db
+import Script
+import Database
 
 class Displays(object):
 
     def __init__(self):
-        spaces_display_configuration = json.loads(script.shell('plutil -convert json ~/Library/Preferences/com.apple.spaces.plist -o -', return_output=True))
+        spaces_display_configuration = json.loads(Script.shell('plutil -convert json ~/Library/Preferences/com.apple.spaces.plist -o -', return_output=True))
         self.displays = spaces_display_configuration["SpacesDisplayConfiguration"]["Management Data"]["Monitors"]
         self.filterout_virtual_display()
         self.determine_main_display_uuid()
@@ -21,7 +21,7 @@ class Displays(object):
         # In the plist we've loaded earlier, on a MBP the Main Display's UUID isn't listed
         # so before we alter the wallpaper database, we retrieve it by getting them all
         # and removing those we know. By elimination, the last one should be the main.
-        uuids = db.get_display_uuids()
+        uuids = Database.get_display_uuids()
         main_display = None
         for display in self.displays:
             uuid = display["Display Identifier"]
