@@ -10,6 +10,8 @@ import urllib2
 import urlparse
 
 import Origins
+import db
+import script
 
 FILENAME = 'ngwallpaper'
 EXTENSIONS = ['.jpg', '.jpeg', '.png']
@@ -88,11 +90,17 @@ class Wallpaper(object):
         return False
 
     @staticmethod
-    def eraseAll(destination):
+    def eraseFiles(destination):
         for extension in EXTENSIONS:
             for f in glob.glob(destination + FILENAME + '*' + extension):
                 print "suppression de "+ f
                 os.remove(f)
+
+    @staticmethod
+    def eraseAll(destination, store):
+        db.erase_db()
+        if not store:
+            Wallpaper.eraseFiles(destination)
 
     @staticmethod
     def  _filename(url):
@@ -124,4 +132,40 @@ class Wallpaper(object):
 
         # Done!
         return file
+
+    @staticmethod
+    def set(displays, files, differenciation_by):
+        if differenciation_by == 'no':
+            data_id = db.insert_image(files[0])
+            for display in displays:
+                display_id = db.insert_display(display['Display Identifier'])
+                for space in display['Spaces']:
+                    print 'display : '+ display['Display Identifier'] +' / space : '+ space['uuid']
+                    space_id = db.insert_space(space['uuid'])
+                    db.assign_image_to_space_display(space_id, display_id, data_id)
+
+        if differenciation_by == 'display' or differenciation_by == 'monitor':
+            for i in xrange(0, len(displays)):
+                data_id = db.insert_image(files[i])
+                display = displays[i]
+                display_id = db.insert_display(display['Display Identifier'])
+                for space in display['Spaces']:
+                    space_id = db.insert_space(space['uuid'])
+                    db.assign_image_to_space_display(space_id, display_id, data_id)
+
+        if differenciation_by == 'space' :
+            cpt_spaces = 0
+            for i in xrange(0, len(displays)):
+                display = displays[i]
+                display_id = db.insert_display(display['Display Identifier'])
+
+                for space in display['Spaces']:
+                    data_id = db.insert_image(files[cpt_spaces])
+                    space_id = db.insert_space(space['uuid'])
+                    db.assign_image_to_space_display(space_id, display_id, data_id)
+
+                    cpt_spaces += 1
+
+        script.shell('killall Dock')
+
 
