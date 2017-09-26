@@ -14,12 +14,12 @@ def how_many_pictures_do_we_need(displays, differenciation_by):
     if differenciation_by == 'no':
         return 1
     if differenciation_by == 'display' or differenciation_by == 'monitor':
-        return len(displays)
+        return displays.displayCount()
     if differenciation_by == 'space':
-        return sum(len(display['Spaces']) for display in displays)
+        return displays.spaceCount()
 
 def main(origins, destination, store, retries, differenciation_by):
-    displays = Displays.load()
+    displays = Displays()
 
     nb_files_to_load = how_many_pictures_do_we_need(displays, differenciation_by)
     files = []
