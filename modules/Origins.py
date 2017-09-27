@@ -2,61 +2,29 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import absolute_import
-import urllib2
+
+import os
 import re
 import abc
+import sys
+import json
+import time
 import random
+import hashlib
+import urllib2
 import urlparse
 from xml.etree import ElementTree
 from BeautifulSoup import BeautifulSoup
-import json
+
+import KnownOrigins
+
+# used to call dynamically any class from this module with `getattr(Origins, 'className')()`
+Origins = sys.modules[__name__]
 
 HTTP_TIMEOUT = 30
 
-MISCELANEOUS_GALLERIES = [
-    # Life in Color.
-    'http://photography.nationalgeographic.com/photography/photos/life-color-kaleidoscope/',
-    'http://photography.nationalgeographic.com/photography/photos/life-color-red/',
-    'http://photography.nationalgeographic.com/photography/photos/life-color-orange/',
-    'http://photography.nationalgeographic.com/photography/photos/life-color-yellow/',
-    'http://photography.nationalgeographic.com/photography/photos/life-color-green/',
-    'http://photography.nationalgeographic.com/photography/photos/life-color-blue/',
-    'http://photography.nationalgeographic.com/photography/photos/life-color-purple/',
-    'http://photography.nationalgeographic.com/photography/photos/life-color-gold/',
-    'http://photography.nationalgeographic.com/photography/photos/life-color-silver/',
-    'http://photography.nationalgeographic.com/photography/photos/life-color-white/',
-    'http://photography.nationalgeographic.com/photography/photos/life-color-brown/',
-    'http://photography.nationalgeographic.com/photography/photos/life-color-black/',
-    # Patterns in Nature.
-    'http://photography.nationalgeographic.com/photography/photos/patterns-flora/',
-    'http://photography.nationalgeographic.com/photography/photos/patterns-nature-reflections/',
-    'http://photography.nationalgeographic.com/photography/photos/patterns-landscapes/',
-    'http://photography.nationalgeographic.com/photography/photos/patterns-nature-trees/',
-    'http://photography.nationalgeographic.com/photography/photos/patterns-animals/',
-    'http://photography.nationalgeographic.com/photography/photos/patterns-butterflies/',
-    'http://photography.nationalgeographic.com/photography/photos/patterns-nature-rainbows/',
-    'http://photography.nationalgeographic.com/photography/photos/patterns-island-aerials/',
-    'http://photography.nationalgeographic.com/photography/photos/patterns-snow-ice/',
-    'http://photography.nationalgeographic.com/photography/photos/patterns-rocks-lava/',
-    'http://photography.nationalgeographic.com/photography/photos/patterns-water/',
-    'http://photography.nationalgeographic.com/photography/photos/patterns-coral/',
-    'http://photography.nationalgeographic.com/photography/photos/patterns-aurorae/',
-    # Other.
-    'http://photography.nationalgeographic.com/photography/photos/visions-of-earth-wallpapers',
-    'http://animals.nationalgeographic.com/animals/photos/bird-wallpapers/',
-    'http://photography.nationalgeographic.com/photography/photos/underwater-wrecks/',
-    'http://photography.nationalgeographic.com/photography/photos/mysterious-earth/',
-    'http://photography.nationalgeographic.com/photography/photos/ocean-soul/',
-    'http://photography.nationalgeographic.com/photography/photos/extreme-earth/',
-    'http://photography.nationalgeographic.com/photography/photos/megatransect-gallery/',
-    'http://photography.nationalgeographic.com/photography/photos/cave-exploration/',
-    'http://photography.nationalgeographic.com/photography/photos/volcano-exploration/',
-    'http://photography.nationalgeographic.com/photography/photos/north-pole-expeditions/',
-    'http://adventure.nationalgeographic.com/adventure/everest/climbing-everest-photo-gallery/',
-    'http://adventure.nationalgeographic.com/adventure/mount-everest-photo-gallery',
-]
-
 class Origin(object):
+    ''' Meta-class for the origins (repositories) of wallpapers '''
     __metaclass__ = abc.ABCMeta
 
     def __init__(self):
@@ -66,16 +34,106 @@ class Origin(object):
     def photo(self):
         pass
 
+    @property
+    def class_name(self):
+        return self.__class__.__name__
+
+class ComposedOrigin(Origin):
+    ''' Get one wallpaper from multiple origins '''
+
+    def __init__(self, origins=[]):
+        super(ComposedOrigin, self).__init__()
+        self._origins = origins
+
+    @property
+    def photo(self):
+        result = None
+        if self._origins:
+            origin = random.choice(self._origins)
+            result = origin.photo
+        return result
+
+    def addOriginDefinitions(self, origin_definitions):
+        for origin_definition in origin_definitions:
+            origin = self._constructOrigin(origin_definition)
+            self._origins.append(origin)
+        return self
+
+    def _constructOrigin(self, origin_definition):
+        name = origin_definition['name']
+        obj = getattr(Origins, origin_definition['class'])(name)
+        return obj
+
 
 class LeafOrigin(Origin):
-    __metaclass__ = abc.ABCMeta
+    ''' Meta-class for origins leaves. Get one wallpaper from one origin '''
 
-    def __init__(self):
+    def __init__(self, name):
         super(LeafOrigin, self).__init__()
+        self.name = name
+        self._cache = []
+
+    @property
+    def photo(self):
+        result = None
+        if self._photos:
+            result = random.choice(self._photos)
+            result['origin'] = self.class_name
+            result['name'] = self.name
+        return result
+
+    @abc.abstractproperty
+    def _root_url(self):
+        pass
+
+    @property
+    def _path(self):
+        return self.name
+
+    @property
+    def _url(self):
+        return self._root_url + self._path
 
     @property
     def _timeout(self):
         return HTTP_TIMEOUT
+
+    @property
+    def _cache_timeout(self):
+        return 3600 * 24 * 30
+
+    @property
+    def _cache_filename(self):
+        return '/tmp/ngwallpaper-'+ hashlib.sha256(self._url).hexdigest() +'.html'
+
+
+    @property
+    def _photos(self):
+        if len(self._cache) <= 0:
+            html = self._download_gallery()
+            self._cache = self._parse_photo_urls(html)
+        return self._cache
+
+    @abc.abstractmethod
+    def _parse_photo_urls(self, html):
+        pass
+
+    def _download_gallery(self, force=False):
+        cache = self._cache_filename
+        html = ''
+        if not os.path.isfile(cache) or time.time() - os.path.getmtime(cache) > self._cache_timeout:
+            ifp = urllib2.urlopen(self._url, None, self._timeout)
+            assert \
+                ifp.getcode() == 200, \
+                'Error while downloading gallery page : '+ self._url
+            html = ifp.read()
+            ifp.close()
+            with open(cache, 'w') as ofp:
+                ofp.write(html)
+        else:
+            with open(cache, 'r') as ifp:
+                html = ifp.read()
+        return html
 
     def _expand_href(self, url, href):
         if href.startswith('http://') or href.startswith('https://'):
@@ -86,49 +144,64 @@ class LeafOrigin(Origin):
             parsed = urlparse.urlparse(url)
             return parsed.scheme + '://' + parsed.netloc + href
 
-
-class NGMOrigin(LeafOrigin):
-    __metaclass__ = abc.ABCMeta
-
-    def __init__(self):
-        super(NGMOrigin, self).__init__()
-        self._cache = []
-
-    @property
-    def photo(self):
-        result = None
-        if self._indices:
-            index = random.choice(self._indices)
-            fp = urllib2.urlopen(index, None, self._timeout)
-            if fp.getcode() == 200:
-                urls = self._parse_photo_urls(fp.read())
-                if urls:
-                    result = {
-                        'index': index,
-                        'url': random.choice(urls),
-                    }
-            fp.close()
-        return result
-
-    @property
-    def _indices(self):
-        if not self._cache:
-            fp = urllib2.urlopen(self._root_url + self._path, None, self._timeout)
-            if fp.getcode() == 200:
-                options = BeautifulSoup(fp.read()).\
-                    find('div', {'id': self._div_id}).\
-                    findAll('option', {'value': re.compile(self._value_re)})
-                self._cache = [self._root_url + option['value'] for option in options]
-            fp.close()
-        return self._cache
+class RedditOrigin(LeafOrigin):
 
     @property
     def _root_url(self):
-        return 'http://ngm.nationalgeographic.com'
+        return 'https://www.reddit.com/'
 
-    @abc.abstractproperty
+    @property
+    def _cache_timeout(self):
+        # the reddit pages are updated much more frequently than the one from NGM, so we reduce the cache timeout
+        return 3600
+
+    def _parse_photo_urls(self, html):
+        result = []
+        entries = BeautifulSoup(html).findAll('div', {'class':re.compile('entry *')})
+        for entry in entries:
+            print entry
+            print
+            domain = entry.find('a', { 'href': re.compile('/domain/*') }).string
+            if re.match('.*imgur.*', domain): # for now, only imgur domains are accepted, but it should expand to others in the future
+                url = entry.find('a', { 'class': re.compile('title *') })['href']
+                result.append({'url': url, 'domain': domain})
+        return result
+
+class RedditSubOrigin(RedditOrigin):
+
+    @property
     def _path(self):
-        pass
+        return 'r/'+ self.name
+
+class RedditUserOrigin(RedditOrigin):
+
+    @property
+    def _path(self):
+        return 'u/'+ self.name
+
+class NGMOrigin(LeafOrigin):
+
+    @property
+    def _photos(self):
+        photos = None
+
+        if not self._cache:
+            html = self._download_gallery()
+            options = BeautifulSoup(html).\
+                find('div', {'id': self._div_id}).\
+                findAll('option', {'value': re.compile(self._value_re)})
+            self._cache = [self._root_url + option['value'] for option in options]
+
+        index = random.choice(self._cache)
+        fp = urllib2.urlopen(index, None, self._timeout)
+        if fp.getcode() == 200:
+            photos = self._parse_photo_urls(fp.read())
+
+        return photos
+
+    @property
+    def _root_url(self):
+        return 'http://ngm.nationalgeographic.com/'
 
     @abc.abstractproperty
     def _div_id(self):
@@ -138,18 +211,9 @@ class NGMOrigin(LeafOrigin):
     def _value_re(self):
         pass
 
-    @abc.abstractmethod
-    def _parse_photo_urls(self, contents):
-        pass
-
-
 class NGMLatest(NGMOrigin):
-    def __init__(self):
-        super(NGMLatest, self).__init__()
-
-    @property
-    def _path(self):
-        return '/wallpaper'
+    def __init__(self, name='wallpaper'):
+        super(NGMLatest, self).__init__(name=name)
 
     @property
     def _div_id(self):
@@ -159,21 +223,20 @@ class NGMLatest(NGMOrigin):
     def _value_re(self):
         return r'^/wallpaper/\d{4}/'
 
-    def _parse_photo_urls(self, contents):
+    def _parse_photo_urls(self, contents, index):
         result = []
         gallery = BeautifulSoup(contents).find('div', {'id': 'gallery'})
         for item in gallery.findAll('a', {'target': '_blank', 'href': re.compile(r'^/wallpaper/img/')}):
-            result.append(self._expand_href(self._root_url, item['href']))
+            result.append({
+                'index': index,
+                'url': self._expand_href(self._root_url, item['href'])
+            })
         return result
 
 
 class NGMArchive(NGMOrigin):
-    def __init__(self):
-        super(NGMArchive, self).__init__()
-
-    @property
-    def _path(self):
-        return '/wallpaper/download'
+    def __init__(self, name='wallpaper/download'):
+        super(NGMArchive, self).__init__(name=name)
 
     @property
     def _div_id(self):
@@ -183,75 +246,52 @@ class NGMArchive(NGMOrigin):
     def _value_re(self):
         return r'^/wallpaper/\d{4}/.*\.xml$'
 
-    def _parse_photo_urls(self, contents):
+    def _parse_photo_urls(self, contents, index):
         result = []
         root = ElementTree.fromstring(contents)
         for photo in root.findall('photo'):
             wallpaper = photo.find('wallpaper')
-            url = \
-                wallpaper.text.strip() or \
-                wallpaper[-1].text.strip()
+            url = wallpaper.text.strip() or wallpaper[-1].text.strip()
             if url:
-                result.append(self._expand_href(self._root_url, url))
+                result.append({
+                    'index': index,
+                    'url': self._expand_href(self._root_url, url)
+                })
         return result
 
 
-class MiscellaneousGalleriesOrigin(LeafOrigin):
-    def __init__(self, urls):
-        super(MiscellaneousGalleriesOrigin, self).__init__()
-        self._urls = urls
+class NGMGalleryOrigin(LeafOrigin):
 
+    @abc.abstractproperty
+    def _root_url(self):
+        pass
+
+    def _parse_photo_urls(self, html):
+        photos = []
+        json_obj =  json.loads(
+                        BeautifulSoup(html).\
+                        find('div', { "data-pestle-module": "PresentationMode" }).\
+                        find('script').string
+                    )
+        items = json_obj['json']['items'][0]['items']
+
+        for item in items:
+            url = self._expand_href(self._url, item['url'])
+            photos.append({ 'url': url })
+
+        return photos
+
+class NGMGalleryPhotographyOrigin(NGMGalleryOrigin):
     @property
-    def photo(self):
-        # Initializations.
-        gallery_url = random.choice(self._urls)
-        wallpaper_url = None
-        result = None
+    def _root_url(self):
+        return 'http://photography.nationalgeographic.com/photography/photos/'
 
-        # Select random wallpaper page URL from gallery.
-        fp = urllib2.urlopen(gallery_url, None, self._timeout)
-        if fp.getcode() == 200:
-            options = []
-
-            json_obj =  json.loads(
-                            BeautifulSoup(fp.read()).\
-                            find('div', { "data-pestle-module": "PresentationMode" }).\
-                            find('script').string
-                        )
-            items = json_obj['json']['items'][0]['items']
-
-            for item in items:
-                options.append(item['url'])
-
-            if len(options) > 0:
-                wallpaper_url = self._expand_href(gallery_url, random.choice(options))
-
-        fp.close()
-
-        # Fetch wallpaper page URL and extract image URL.
-        if wallpaper_url is not None:
-            fp = urllib2.urlopen(wallpaper_url, None, self._timeout)
-            if fp.getcode() == 200:
-                result = {
-                    'index': gallery_url,
-                    'url': wallpaper_url
-                }
-            fp.close()
-
-        # Done!
-        return result
-
-
-class ComposedOrigin(Origin):
-    __metaclass__ = abc.ABCMeta
-
-    def __init__(self, origins):
-        super(ComposedOrigin, self).__init__()
-        self._origins = origins
-
+class NGMGalleryAnimalsOrigin(NGMGalleryOrigin):
     @property
-    def photo(self):
-        result = None
-        if self._origins:
-            result = random.choice(self._origins).photo
-        return result
+    def _root_url(self):
+        return 'http://animals.nationalgeographic.com/animals/photos/'
+
+class NGMGalleryAdventureOrigin(NGMGalleryOrigin):
+    @property
+    def _root_url(self):
+        return 'http://adventure.nationalgeographic.com/adventure/'

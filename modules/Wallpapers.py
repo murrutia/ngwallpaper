@@ -4,7 +4,9 @@
 import os
 import sys
 import glob
+import json
 import time
+import random
 import hashlib
 import urllib2
 import urlparse
@@ -81,8 +83,7 @@ class Wallpapers(object):
                         os.makedirs(self.meta_folder)
 
                     with open(os.path.join(self.meta_folder, filename + '.txt'), 'w') as fd:
-                        fd.write(wallpaper['index'] + '\n')
-                        fd.write(wallpaper['url'] + '\n')
+                        fd.write(json.dumps(wallpaper, ensure_ascii = False))
 
                     # Done!
                     break
@@ -101,7 +102,7 @@ class Wallpapers(object):
         if self.store and file is None:
             downloaded = []
             for extension in EXTENSIONS:
-                downloaded.extend(glob.glob(destination + FILENAME + '-*' + extension))
+                downloaded.extend(glob.glob(self.destination + FILENAME + '-*' + extension))
             if len(downloaded) > 0:
                 file = random.choice(downloaded)
 
