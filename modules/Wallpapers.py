@@ -11,29 +11,32 @@ import hashlib
 import urllib2
 import urlparse
 
+import Script
 import Origins
 import Database
-import Script
+import getimageinfo
 from Displays import Displays
-
-FILENAME = 'ngwallpaper'
-EXTENSIONS = ['.jpg', '.jpeg', '.png']
 
 class Wallpapers(object):
 
-    def __init__(self, origins, destination, store, retries, differenciation_by):
-        self.origins = origins
-        self.destination = destination
+    def __init__(self, options):
+        self.origins = Origins.ComposedOrigin(options.origins)
+        self.destination = options.destination
         self.meta_folder = self.destination +'/_meta'
-        self.store = store
-        self.retries = retries
-        self.differenciation_by = differenciation_by
+        self.store = options.store
+        self.retries = options.retries
+        self.differenciation_by = options.differenciation_by
+        self.load_from_storage = options.load_from_storage
+        self.minimum_size = [ int(x) for x in options.minimum_size.split('x') ]
         self.displays = Displays()
+
+        if options.clear_cache:
+            self.origins.clear_cache()
 
     def apply(self):
         files = []
         for i in xrange(0, self.pictures_needed_count()):
-            file = self.download_new_wallpaper()
+            file = self.download_wallpaper()
             files.append(file)
 
         self.eraseAll()
@@ -47,112 +50,118 @@ class Wallpapers(object):
         if self.differenciation_by == 'space':
             return self.displays.spaceCount()
 
-    def download_new_wallpaper(self):
-        # Try to download a new wallpaper until all retries have been exhausted.
-        for i in xrange(self.retries, 0, -1):
-            # Initializations.
-            file = None
+    def store_all(self):
+        # if we store all the images, we consider that we are in storage mode,
+        # so we set `store` to True to avoid erasing them all in the final step
+        self.store = True
 
-            # Add some delay.
-            time.sleep(min(float((self.retries - i) * 100), 5000.0) / 1000.0)
+        wallpapers = self.origins.photos
 
-            # Ignore exceptions.
-            try:
-                # Fetch some random photo.
-                wallpaper = Origins.ComposedOrigin(self.origins).photo
+        for wallpaper in wallpapers:
+            self.download_wallpaper(wallpaper)
 
-                assert \
-                    wallpaper is not None, \
-                    'Failed to fetch wallpaper'
+    def download_wallpaper(self, wallpaper=None):
 
-                # Calculate destination filename.
-                # Originally the filename changed only if we stored the picture, but we must now do it in no store
-                # mode to be able to store multiple images in case of different pictures by displays / spaces.
-                filename = self._filename(wallpaper['url'])
+        randomize = True if wallpaper is None else False
 
-                # Skip if the file already exists.
-                if not self.store or not self.exists(filename):
-                    # Download selected photo.
-                    file = self._download(wallpaper['url'], filename)
-                    assert \
-                        file is not None, \
-                        'Failed to download wallpaper'
+        if not self.load_from_storage:
+            # Try to download a new wallpaper until all retries have been exhausted.
+            for i in xrange(self.retries, 0, -1):
+                # Initializations.
+                file = None
 
-                    # Store meta data of the selected photo
-                    if not os.path.exists(self.meta_folder):
-                        os.makedirs(self.meta_folder)
+                # Ignore exceptions.
+                try:
+                    if randomize:
+                        wallpaper = self.origins.photo
+                    assert wallpaper is not None, "Failed to get wallpaper info. randomize : ["+ str(randomize) +"]"
+                    file = self._download_or_retrieve(wallpaper)
 
-                    with open(os.path.join(self.meta_folder, filename + '.txt'), 'w') as fd:
-                        fd.write(json.dumps(wallpaper, ensure_ascii = False))
-
-                    # Done!
                     break
-                else:
+
+                except Exception as e:
                     sys.stdout.write('%(attempt)d: %(message)s\n' % {
                         'attempt': i,
-                        'message': 'wallpaper already exists (%s)' % wallpaper['url'],
+                        'message': 'unexpected failure (%s)' % e,
                     })
-            except Exception as e:
-                sys.stdout.write('%(attempt)d: %(message)s\n' % {
-                    'attempt': i,
-                    'message': 'unexpected failure (%s)' % e,
-                })
+                    # Add a delay before next retry
+                    if i > 0 and wallpaper:
+                        time.sleep(wallpaper.origin.download_delay)
 
-        # If a new wallpaper was not downloaded, try to use an existing one.
-        if self.store and file is None:
-            downloaded = []
-            for extension in EXTENSIONS:
-                downloaded.extend(glob.glob(self.destination + FILENAME + '-*' + extension))
-            if len(downloaded) > 0:
-                file = random.choice(downloaded)
+        if not file and randomize:
+            file = self._get_a_wallpaper_already_stored()
 
         return file
 
-    def exists(self, filename):
-        for extension in EXTENSIONS:
-            if len(glob.glob(self.destination + filename + extension)) > 0:
-                return True
-        return False
+    def _download_or_retrieve(self, wallpaper):
+        file = None
+        wallpaper.destination = self.destination
+        # Do not continue if the extension is not supported.
+        if wallpaper.extension in Origins.EXTENSIONS:
+            file = wallpaper.filepath
+            if os.path.isfile(file):
+                print "already downloaded : "+ wallpaper.url
+            else:
+                file = self._download(wallpaper)
+                assert file is not None, 'Failed to download wallpaper : ' + str(wallpaper)
+
+        return file
+
+    def _download(self, wallpaper):
+        file = wallpaper.filepath
+
+        print "downloading : "+ wallpaper.url
+        # Download URL. The User-Agent header is set to avoid 403 errors from some websites
+        headers = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36' }
+        request = urllib2.Request(wallpaper.url, headers=headers)
+        ifp = urllib2.urlopen(request)
+        assert ifp.getcode() == 200, 'Got unexpected HTTP response'
+        wallpaper.image_type, wallpaper.width, wallpaper.height = getimageinfo.getImageInfo(ifp)
+        ifp.close()
+
+        if not wallpaper.respects_dimensions(self.minimum_size):
+            print "Image size of "+ str(wallpaper.width) +'x'+ str(wallpaper.height) +' : will not be downloaded because smaller than '+ 'x'.join([ str(x) for x in self.minimum_size ])
+        else:
+            ifp = urllib2.urlopen(request)
+            with open(file, 'wb') as ofd:
+                ofd.write(ifp.read())
+            self._store_wallpaper_metadata(wallpaper)
+            ifp.close()
+
+
+        # Done!
+        return file
+
+    def _store_wallpaper_metadata(self, wallpaper):
+        # Store meta data of the selected photo
+        if not os.path.exists(self.meta_folder):
+            os.makedirs(self.meta_folder)
+        with open(os.path.join(self.meta_folder, wallpaper.filename + '.txt'), 'w') as fd:
+            fd.write(str(wallpaper))
+
+    def _get_a_wallpaper_already_stored(self):
+        file = None
+        filename_bases = self.origins.filename_base
+        downloaded = []
+        for filename_base in filename_bases:
+            downloaded.extend(glob.glob(self.destination + filename_base +'*'))
+        if len(downloaded) > 0:
+            file = random.choice(downloaded)
+
+        if file:
+            print 'retrieving from storage : '+ file
+        return file
 
     def eraseFiles(self):
-        for extension in EXTENSIONS:
-            for f in glob.glob(self.destination + FILENAME + '*' + extension):
-                print "suppression de "+ f
-                os.remove(f)
+        for f in glob.glob(os.path.join(self.destination, Origins.FILENAMEBASE + '*')):
+            print "suppression de "+ f
+            os.remove(f)
 
     def eraseAll(self):
         Database.erase_db()
         if not self.store:
-            Wallpaper.eraseFiles(self.destination)
+            self.eraseFiles()
 
-    def  _filename(self, url):
-        return FILENAME + '-' + hashlib.sha256(url).hexdigest()
-
-    def _download(self, url, filename):
-        # Initializations.
-        file = None
-
-        # Extract extension.
-        extension = os.path.splitext(urlparse.urlparse(url).path)[1].lower()
-
-        # Do not continue if the extension is not supported.
-        if extension in EXTENSIONS:
-            # Set destination file name.
-            file = os.path.join(
-                self.destination,
-                filename + extension)
-
-            # Download URL.
-            ifp = urllib2.urlopen(url, None, Origins.HTTP_TIMEOUT)
-            assert \
-                ifp.getcode() == 200, \
-                'Got unexpected HTTP response'
-            with open(file, 'wb') as ofd:
-                ofd.write(ifp.read())
-            ifp.close()
-
-        # Done!
-        return file
 
     def set(self, files):
         if self.differenciation_by == 'no':
@@ -160,7 +169,6 @@ class Wallpapers(object):
             for display in self.displays:
                 display_id = Database.insert_display(display['Display Identifier'])
                 for space in display['Spaces']:
-                    print 'display : '+ display['Display Identifier'] +' / space : '+ space['uuid']
                     space_id = Database.insert_space(space['uuid'])
                     Database.assign_image_to_space_display(space_id, display_id, data_id)
 
@@ -187,5 +195,3 @@ class Wallpapers(object):
                     cpt_spaces += 1
 
         Script.shell('killall Dock')
-
-
