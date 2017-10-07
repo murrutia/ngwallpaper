@@ -16,9 +16,9 @@ def shell(code, return_output=False):
         stderr=sys.stdout
     )
 
-def sqlite(command, return_output=False):
+def sqlite(command, return_output=False, database='~/Library/Application\ Support/Dock/desktoppicture.db'):
     return shell(
-        ''' sqlite3 ~/Library/Application\ Support/Dock/desktoppicture.db "%(command)s"
-        ''' % { 'command': command },
+        ''' sqlite3 %(database)s "%(command)s"
+        ''' % { 'database': database, 'command': command },
         return_output
     )

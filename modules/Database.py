@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import script
+import Script
 
 def insert_image(file):
     return script.sqlite(

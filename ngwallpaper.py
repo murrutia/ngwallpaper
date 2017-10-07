@@ -81,7 +81,7 @@ if __name__ == '__main__':
         help='number of retries before failing / using a previously downloaded wallpaper')
 
     parser.add_argument(
-        '--differenciation_by', dest='differenciation_by', required=False,
+        '--differenciation-by', dest='differenciation_by', required=False,
         default='no',
         help='Differenciation of images by display or space (possible values : no (default), display, space)')
 

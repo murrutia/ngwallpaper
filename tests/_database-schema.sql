@@ -1,0 +1,16 @@
+CREATE TABLE pictures (space_id INTEGER, display_id INTEGER);
+CREATE TABLE preferences (key INTEGER, data_id INTEGER, picture_id INTEGER);
+CREATE TABLE spaces (space_uuid VARCHAR);
+CREATE TABLE displays (display_uuid);
+CREATE TABLE data (value);
+CREATE TABLE prefs (key INTEGER, data);
+CREATE INDEX pictures_index ON pictures (space_id, display_id);
+CREATE INDEX preferences_index ON preferences (picture_id, data_id);
+CREATE INDEX spaces_index ON spaces (space_uuid);
+CREATE INDEX displays_index ON displays (display_uuid);
+CREATE INDEX data_index ON data (value);
+CREATE INDEX prefs_index ON prefs (key);
+CREATE TRIGGER space_deleted AFTER DELETE ON spaces BEGIN DELETE FROM pictures WHERE space_id=OLD.ROWID;END;
+CREATE TRIGGER display_deleted AFTER DELETE ON displays BEGIN DELETE FROM pictures WHERE display_id=OLD.ROWID;END;
+CREATE TRIGGER picture_deleted AFTER DELETE ON pictures BEGIN DELETE FROM preferences WHERE picture_id=OLD.ROWID; DELETE FROM displays WHERE ROWID=OLD.display_id AND NOT EXISTS (SELECT NULL FROM pictures WHERE display_id=OLD.display_id); DELETE FROM spaces WHERE ROWID=OLD.space_id AND NOT EXISTS (SELECT NULL FROM pictures WHERE space_id=OLD.space_id);END;
+CREATE TRIGGER preferences_deleted AFTER DELETE ON preferences BEGIN DELETE FROM data WHERE ROWID=OLD.data_id AND NOT EXISTS (SELECT NULL FROM preferences WHERE data_id=OLD.data_id);END;
