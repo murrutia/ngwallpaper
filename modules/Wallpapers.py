@@ -65,13 +65,11 @@ class Wallpapers(object):
     def download_wallpaper(self, wallpaper=None):
 
         randomize = True if wallpaper is None else False
+        file = None
 
         if not self.load_from_storage:
             # Try to download a new wallpaper until all retries have been exhausted.
             for i in xrange(self.retries, 0, -1):
-                # Initializations.
-                file = None
-
                 # Ignore exceptions.
                 try:
                     if randomize:
@@ -82,10 +80,9 @@ class Wallpapers(object):
                     break
 
                 except Exception as e:
-                    sys.stdout.write('%(attempt)d: %(message)s\n' % {
+                    Script.print_error('%(attempt)d: %(message)s\n' % {
                         'attempt': i,
-                        'message': 'unexpected failure (%s)' % e,
-                    })
+                        'message': 'unexpected failure (%s)' % e})
                     # Add a delay before next retry
                     if i > 0 and wallpaper:
                         time.sleep(wallpaper.origin.download_delay)
@@ -168,6 +165,7 @@ class Wallpapers(object):
 
     def set(self, files):
         if self.differenciation_by == 'no':
+            print "All displays set with image : "+files[0]
             data_id = self.db.insert_image(files[0])
             for display in self.displays:
                 display_id = self.db.insert_display(display['Display Identifier'])
@@ -177,9 +175,11 @@ class Wallpapers(object):
 
         if self.differenciation_by == 'display' or self.differenciation_by == 'monitor':
             for i in xrange(0, len(self.displays)):
-                data_id = self.db.insert_image(files[i])
                 display = self.displays[i]
-                display_id = self.db.insert_display(display['Display Identifier'])
+                display_uuid = display['Display Identifier']
+                print "Display ["+ display_uuid +"] set with image : "+ files[i]
+                data_id = self.db.insert_image(files[i])
+                display_id = self.db.insert_display(display_uuid)
                 for space in display['Spaces']:
                     space_id = self.db.insert_space(space['uuid'])
                     self.db.assign_image_to_space_display(space_id, display_id, data_id)
@@ -188,9 +188,11 @@ class Wallpapers(object):
             cpt_spaces = 0
             for i in xrange(0, len(self.displays)):
                 display = self.displays[i]
-                display_id = self.db.insert_display(display['Display Identifier'])
+                display_uuid = display['Display Identifier']
+                display_id = self.db.insert_display(display_uuid)
 
                 for space in display['Spaces']:
+                    print "Display ["+ display_uuid +"], space ["+ space['uuid'] +"] set with image : "+ files[cpt_spaces]
                     data_id = self.db.insert_image(files[cpt_spaces])
                     space_id = self.db.insert_space(space['uuid'])
                     self.db.assign_image_to_space_display(space_id, display_id, data_id)

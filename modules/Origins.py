@@ -18,6 +18,7 @@ from contextlib import closing
 from xml.etree import ElementTree
 from BeautifulSoup import BeautifulSoup
 
+import Script
 import KnownOrigins
 
 # used to call dynamically any class from this module with `getattr(Origins, 'className')()`
@@ -236,8 +237,12 @@ class RedditOrigin(LeafOrigin):
             elif domain == 'flickr.com':
                 page = entry.find('a', { 'class': re.compile('title *') })['href']
                 with closing(urllib2.urlopen(page)) as page_fp:
-                    url = BeautifulSoup(page_fp.read()).find('meta', { 'property': 'og:image'})['content']
-                    url = url.replace('_b.', '_h.') # hd version of the image ends with '**_h.jpg'
+                    image_container = BeautifulSoup(page_fp.read()).find('meta', { 'property': 'og:image'})
+                    if image_container:
+                        url = image_container['content']
+                        url = url.replace('_b.', '_h.') # hd version of the image ends with '**_h.jpg'
+                    else:
+                        Script.print_error('The image container was not found for [%(url)s]' % { 'url': page})
 
             elif domain == 'imgur.com':
                 page = entry.find('a', { 'class': re.compile('title *') })['href']
@@ -245,14 +250,28 @@ class RedditOrigin(LeafOrigin):
                     image_container = BeautifulSoup(page_fp.read()).find('div', { 'class': re.compile('post-image.*')})
                     if image_container:
                         url = image_container.find('a')['href']
+                    else:
+                        Script.print_error('The image container was not found for [%(url)s]' % { 'url': page})
+
+            elif domain == 'www.artstation.com':
+                page = entry.find('a', { 'class': re.compile('title *') })['href']
+                with closing(urllib2.urlopen(page)) as page_fp:
+                    image_container = BeautifulSoup(page_fp.read()).find('div', { 'class': 'artwork-image'})
+                    if image_container:
+                        url = image_container.find('img')['src']
+                    else:
+                        Script.print_error('The image container was not found for [%(url)s]' % { 'url': page})
 
             elif re.match('.*deviantart\..*', domain):
-                page = entry.find('a', { 'class': re.compile('title *') })['href']
+                image_container = entry.find('a', { 'class': re.compile('title *') })
+                page = image_container['href']
                 if PhotoInfo.is_an_image(page):
                     url = page
                 else:
                     with closing(urllib2.urlopen(page)) as page_fp:
-                        url = BeautifulSoup(page_fp.read()).find('img', { 'class': re.compile('dev-content-full ')})['src']
+                        image_container = BeautifulSoup(page_fp.read()).find('img', { 'class': re.compile('dev-content-full ')})
+                        if image_container:
+                            url = image_container['src']
 
             else:
                 url = entry.find('a', { 'class': re.compile('title *') })['href']

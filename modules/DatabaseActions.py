@@ -70,6 +70,7 @@ class DatabaseActions(object):
         return displays
 
     def erase_db(self):
-        # delete all associations and data in DB through actions triggered by picture deletions
         self.sqlite('delete from pictures where 1')
+        self.sqlite('delete from displays where 1')
+        self.sqlite('delete from spaces where 1')
         self.sqlite('delete from data where 1')

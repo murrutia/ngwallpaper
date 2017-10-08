@@ -49,13 +49,13 @@ Galleries = {
         { 'class': 'RedditSubOrigin', 'name': 'wallpaper' },
         { 'class': 'RedditSubOrigin', 'name': 'earthporn' },
         { 'class': 'RedditSubOrigin', 'name': 'spaceporn' },
-        { 'class': 'RedditSubOrigin', 'name': 'geekporn' },
-        { 'class': 'RedditSubOrigin', 'name': 'machineporn' },
+        # { 'class': 'RedditSubOrigin', 'name': 'geekporn' },
+        # { 'class': 'RedditSubOrigin', 'name': 'machineporn' },
         { 'class': 'RedditSubOrigin', 'name': 'quotesporn' },
         { 'class': 'RedditSubOrigin', 'name': 'VeryLargeImages' },
         { 'class': 'RedditSubOrigin', 'name': 'ImaginaryBattlefields' },
         { 'class': 'RedditSubOrigin', 'name': 'ImaginaryLandscapes' },
-        { 'class': 'RedditSubOrigin', 'name': 'unixporn' },
+        # { 'class': 'RedditSubOrigin', 'name': 'unixporn' },
         { 'class': 'RedditUserOrigin', 'name': 'kjoneslol/m/sfwpornnetwork' },
     ]
 }
