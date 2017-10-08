@@ -13,9 +13,9 @@ import urlparse
 
 import Script
 import Origins
-import Database
 import getimageinfo
 from Displays import Displays
+from DatabaseActions import DatabaseActions
 
 class Wallpapers(object):
 
@@ -29,17 +29,19 @@ class Wallpapers(object):
         self.load_from_storage = options.load_from_storage
         self.minimum_size = [ int(x) for x in options.minimum_size.split('x') ]
         self.displays = Displays()
+        self.db = DatabaseActions()
 
         if options.clear_cache:
             self.origins.clear_cache()
 
     def apply(self):
+        self.eraseAll()
+
         files = []
         for i in xrange(0, self.pictures_needed_count()):
             file = self.download_wallpaper()
             files.append(file)
 
-        self.eraseAll()
         self.set(files)
 
     def pictures_needed_count(self):
@@ -123,6 +125,7 @@ class Wallpapers(object):
             print "Image size of "+ str(wallpaper.width) +'x'+ str(wallpaper.height) +' : will not be downloaded because smaller than '+ 'x'.join([ str(x) for x in self.minimum_size ])
         else:
             ifp = urllib2.urlopen(request)
+
             with open(file, 'wb') as ofd:
                 ofd.write(ifp.read())
             self._store_wallpaper_metadata(wallpaper)
@@ -158,39 +161,39 @@ class Wallpapers(object):
             os.remove(f)
 
     def eraseAll(self):
-        Database.erase_db()
+        self.db.erase_db()
         if not self.store:
             self.eraseFiles()
 
 
     def set(self, files):
         if self.differenciation_by == 'no':
-            data_id = Database.insert_image(files[0])
+            data_id = self.db.insert_image(files[0])
             for display in self.displays:
-                display_id = Database.insert_display(display['Display Identifier'])
+                display_id = self.db.insert_display(display['Display Identifier'])
                 for space in display['Spaces']:
-                    space_id = Database.insert_space(space['uuid'])
-                    Database.assign_image_to_space_display(space_id, display_id, data_id)
+                    space_id = self.db.insert_space(space['uuid'])
+                    self.db.assign_image_to_space_display(space_id, display_id, data_id)
 
         if self.differenciation_by == 'display' or self.differenciation_by == 'monitor':
             for i in xrange(0, len(self.displays)):
-                data_id = Database.insert_image(files[i])
+                data_id = self.db.insert_image(files[i])
                 display = self.displays[i]
-                display_id = Database.insert_display(display['Display Identifier'])
+                display_id = self.db.insert_display(display['Display Identifier'])
                 for space in display['Spaces']:
-                    space_id = Database.insert_space(space['uuid'])
-                    Database.assign_image_to_space_display(space_id, display_id, data_id)
+                    space_id = self.db.insert_space(space['uuid'])
+                    self.db.assign_image_to_space_display(space_id, display_id, data_id)
 
         if self.differenciation_by == 'space' :
             cpt_spaces = 0
             for i in xrange(0, len(self.displays)):
                 display = self.displays[i]
-                display_id = Database.insert_display(display['Display Identifier'])
+                display_id = self.db.insert_display(display['Display Identifier'])
 
                 for space in display['Spaces']:
-                    data_id = Database.insert_image(files[cpt_spaces])
-                    space_id = Database.insert_space(space['uuid'])
-                    Database.assign_image_to_space_display(space_id, display_id, data_id)
+                    data_id = self.db.insert_image(files[cpt_spaces])
+                    space_id = self.db.insert_space(space['uuid'])
+                    self.db.assign_image_to_space_display(space_id, display_id, data_id)
 
                     cpt_spaces += 1
 
