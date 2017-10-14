@@ -23,10 +23,15 @@ class Wallpapers(object):
         self.origins = Origins.ComposedOrigin(options.origins)
         self.destination = options.destination
         self.meta_folder = self.destination +'/_meta'
+
         self.store = options.store
+        self.load_from_storage = options.load_from_storage
+        if self.load_from_storage: # if we load from storage, we don't want to erase the previously downloaded wallpapers
+            self.store = True
+
         self.retries = options.retries
         self.differenciation_by = options.differenciation_by
-        self.load_from_storage = options.load_from_storage
+
         self.minimum_size = [ int(x) for x in options.minimum_size.split('x') ]
         self.displays = Displays()
         self.db = DatabaseActions()
@@ -39,8 +44,10 @@ class Wallpapers(object):
 
         files = []
         for i in xrange(0, self.pictures_needed_count()):
-            file = self.download_wallpaper()
-            files.append(file)
+            filepath = None
+            while not filepath: # download wallpaper can return None, so we try until we get a valid path
+                filepath = self.download_wallpaper()
+            files.append(filepath)
 
         self.set(files)
 
@@ -119,7 +126,9 @@ class Wallpapers(object):
         ifp.close()
 
         if not wallpaper.respects_dimensions(self.minimum_size):
+            file = None
             print "Image size of "+ str(wallpaper.width) +'x'+ str(wallpaper.height) +' : will not be downloaded because smaller than '+ 'x'.join([ str(x) for x in self.minimum_size ])
+
         else:
             ifp = urllib2.urlopen(request)
 
@@ -141,10 +150,12 @@ class Wallpapers(object):
 
     def _get_a_wallpaper_already_stored(self):
         file = None
-        filename_bases = self.origins.filename_base
+        filename_bases = self.origins.filename_bases
         downloaded = []
+
         for filename_base in filename_bases:
-            downloaded.extend(glob.glob(self.destination + filename_base +'*'))
+            for extension in Origins.EXTENSIONS:
+                downloaded.extend(glob.glob(self.destination + filename_base +'*'+extension))
         if len(downloaded) > 0:
             file = random.choice(downloaded)
 

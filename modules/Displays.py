@@ -17,7 +17,7 @@ class Displays(object):
         self.determine_main_display_uuid()
 
     def filterout_virtual_display(self):
-        self.displays = filter(lambda m: "Collapsed Space" not in m, self.displays)
+        self.displays = filter(lambda m: "Current Space" in m, self.displays)
 
     def determine_main_display_uuid(self, retry=False):
         # In the plist we've loaded earlier, on a MBP the Main Display's UUID isn't listed

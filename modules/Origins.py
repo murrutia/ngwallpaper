@@ -25,7 +25,7 @@ import KnownOrigins
 Origins = sys.modules[__name__]
 
 HTTP_TIMEOUT = 30
-EXTENSIONS = ['.jpg', '.jpeg', '.png', 'tiff', 'tif']
+EXTENSIONS = ['.jpg', '.jpeg', '.png', '.tiff', '.tif']
 FILENAMEBASE = 'ngwallpaper'
 
 class Origin(object):
@@ -43,9 +43,13 @@ class Origin(object):
     def photos(self):
         pass
 
-    @abc.abstractproperty
+    @property
     def filename_base(self):
         pass
+
+    @property
+    def filename_bases(self):
+        return [self.filename_base]
 
     @abc.abstractmethod
     def clear_cache(self):
@@ -78,10 +82,10 @@ class ComposedOrigin(Origin):
         return result
 
     @property
-    def filename_base(self):
+    def filename_bases(self):
         filename_bases = []
         for origin in self._origins:
-            filename_bases += origin.filename_base
+            filename_bases += origin.filename_bases
         return filename_bases
 
     def clear_cache(self):
@@ -320,12 +324,16 @@ class NGMOrigin(LeafOrigin):
     @property
     def filename_base(self):
         if self.composed:
+            pass
+        return super(NGMOrigin, self).filename_base
+
+    def filename_bases(self):
+        if self.composed:
             filename_bases = []
             for origin in self._origins:
-                filename_bases += origin.filename_base
+                filename_bases += origin.filename_bases
             return filename_bases
-
-        return super(NGMOrigin, self).filename_base
+        return super(NGMOrigin, self).filename_bases
 
     def clear_cache(self):
         if self.composed:
