@@ -253,7 +253,15 @@ class RedditOrigin(LeafOrigin):
                 with closing(urllib2.urlopen(page)) as page_fp:
                     image_container = BeautifulSoup(page_fp.read()).find('div', { 'class': re.compile('post-image.*')})
                     if image_container:
-                        url = image_container.find('a')['href']
+                        link = image_container.find('a')
+                        img = image_container.find('img')
+                        if link:
+                            url = link['href']
+                        elif img:
+                            url = img['src']
+                        else:
+                            Script.print_error('The image url was not found for [%(url)s]' % { 'url': page})
+
                     else:
                         Script.print_error('The image container was not found for [%(url)s]' % { 'url': page})
 
@@ -286,6 +294,7 @@ class RedditOrigin(LeafOrigin):
 
         print
         return result
+
 
 class RedditSubOrigin(RedditOrigin):
 
@@ -493,7 +502,7 @@ class PhotoInfo(object):
         return os.path.join(self.destination, self.basename)
 
     def respects_dimensions(self, dimensions):
-        return self.width > dimensions[0] and self.height > dimensions[1]
+        return self.width >= dimensions[0] and self.height >= dimensions[1]
 
     def __str__(self):
         return json.dumps({

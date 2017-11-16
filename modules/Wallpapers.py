@@ -109,7 +109,7 @@ class Wallpapers(object):
                 print "already downloaded : "+ wallpaper.url
             else:
                 file = self._download(wallpaper)
-                assert file is not None, 'Failed to download wallpaper : ' + str(wallpaper)
+                # assert file is not None, 'Failed to download wallpaper : ' + str(wallpaper)
 
         return file
 
@@ -128,7 +128,6 @@ class Wallpapers(object):
         if not wallpaper.respects_dimensions(self.minimum_size):
             file = None
             print "Image size of "+ str(wallpaper.width) +'x'+ str(wallpaper.height) +' : will not be downloaded because smaller than '+ 'x'.join([ str(x) for x in self.minimum_size ])
-
         else:
             ifp = urllib2.urlopen(request)
 

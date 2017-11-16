@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 Galleries = {
+    # The initial galleries introduced by this script
     'NGM': [
         # Life in Color.
         { 'class': 'NGMGalleryPhotographyOrigin', 'name': 'life-color-kaleidoscope/' },
@@ -49,13 +50,15 @@ Galleries = {
         { 'class': 'RedditSubOrigin', 'name': 'wallpaper' },
         { 'class': 'RedditSubOrigin', 'name': 'earthporn' },
         { 'class': 'RedditSubOrigin', 'name': 'spaceporn' },
+        # { 'class': 'RedditSubOrigin', 'name': 'AbandonedPorn' },
         # { 'class': 'RedditSubOrigin', 'name': 'geekporn' },
         # { 'class': 'RedditSubOrigin', 'name': 'machineporn' },
-        { 'class': 'RedditSubOrigin', 'name': 'quotesporn' },
-        { 'class': 'RedditSubOrigin', 'name': 'VeryLargeImages' },
+        # { 'class': 'RedditSubOrigin', 'name': 'quotesporn' },
+        # { 'class': 'RedditSubOrigin', 'name': 'VeryLargeImages' }, # some images can be very heavy, so keep that in mind
         { 'class': 'RedditSubOrigin', 'name': 'ImaginaryBattlefields' },
         { 'class': 'RedditSubOrigin', 'name': 'ImaginaryLandscapes' },
+        { 'class': 'RedditSubOrigin', 'name': 'ImaginaryTechnology' },
         # { 'class': 'RedditSubOrigin', 'name': 'unixporn' },
-        { 'class': 'RedditUserOrigin', 'name': 'kjoneslol/m/sfwpornnetwork' },
+        # { 'class': 'RedditUserOrigin', 'name': 'kjoneslol/m/sfwpornnetwork' },
     ]
 }
