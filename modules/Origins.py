@@ -235,8 +235,10 @@ class RedditOrigin(LeafOrigin):
             domain = entry.find('span', { 'class': 'domain' }).find('a').string
 
             if domain == 'i.redd.it':
-                cachedhtml = entry.find('div', { 'class': 'expando expando-uninitialized' })['data-cachedhtml']
-                url = re.search('https:\/\/i\.redd\.it\/[^"]*', cachedhtml).group(0)
+                image_container = entry.find('div', { 'class': 'expando expando-uninitialized' })
+                if image_container:
+                    cached_html = image_container['data-cachedhtml']
+                    url = re.search('https:\/\/i\.redd\.it\/[^"]*', cached_html).group(0)
 
             elif domain == 'flickr.com':
                 page = entry.find('a', { 'class': re.compile('title *') })['href']
